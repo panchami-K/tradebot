@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Binance Futures Trading Bot</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #0a0e1a;
+    --surface:   #111827;
+    --card:      #161d2e;
+    --border:    #1f2d45;
+    --accent:    #f0b90b;
+    --accent2:   #00d4aa;
+    --red:       #f6465d;
+    --green:     #0ecb81;
+    --text:      #e2e8f0;
+    --muted:     #64748b;
+    --font-mono: 'Space Mono', monospace;
+    --font-main: 'Syne', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-main);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Grid background ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(240,185,11,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(240,185,11,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrapper { position: relative; z-index: 1; max-width: 960px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+
+  /* ── Header ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.5rem 0 2.5rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 2.5rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .logo-icon {
+    width: 40px; height: 40px;
+    background: var(--accent);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.2rem;
+  }
+  .logo-text { font-size: 1.25rem; font-weight: 800; letter-spacing: -0.02em; }
+  .logo-text span { color: var(--accent); }
+
+  .badge {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    padding: 0.3rem 0.75rem;
+    border-radius: 99px;
+    border: 1px solid;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .badge-testnet { border-color: var(--accent2); color: var(--accent2); }
+  .badge-mock    { border-color: var(--accent);  color: var(--accent); }
+
+  /* ── Status bar ── */
+  .status-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--muted);
+    padding: 0.75rem 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 2rem;
+  }
+  .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+    flex-shrink: 0;
+    transition: background 0.3s;
+  }
+  .dot.connected { background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 2s infinite; }
+  .dot.error     { background: var(--red); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+  /* ── Layout ── */
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+  }
+  @media(max-width: 640px){ .grid{ grid-template-columns: 1fr; } }
+
+  /* ── Card ── */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1.5rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), transparent);
+  }
+  .card-title {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    margin-bottom: 1.25rem;
+  }
+
+  /* ── Form elements ── */
+  .form-group { margin-bottom: 1.1rem; }
+  label {
+    display: block;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    margin-bottom: 0.4rem;
+  }
+  input, select {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.65rem 0.9rem;
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    appearance: none;
+  }
+  input:focus, select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(240,185,11,0.1);
+  }
+  input::placeholder { color: var(--muted); }
+
+  /* ── Side toggle ── */
+  .side-toggle {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+  .side-btn {
+    padding: 0.65rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+  }
+  .side-btn:hover { border-color: var(--text); color: var(--text); }
+  .side-btn.active-buy  { background: rgba(14,203,129,0.15); border-color: var(--green); color: var(--green); }
+  .side-btn.active-sell { background: rgba(246,70,93,0.15);  border-color: var(--red);   color: var(--red); }
+
+  /* ── Mock toggle ── */
+  .mock-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.65rem 0.9rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .mock-row span { font-family: var(--font-mono); font-size: 0.8rem; color: var(--muted); }
+  .toggle-switch {
+    width: 36px; height: 20px;
+    background: var(--border);
+    border-radius: 99px;
+    position: relative;
+    transition: background 0.2s;
+    flex-shrink: 0;
+  }
+  .toggle-switch::after {
+    content: '';
+    position: absolute;
+    top: 3px; left: 3px;
+    width: 14px; height: 14px;
+    background: white;
+    border-radius: 50%;
+    transition: transform 0.2s;
+  }
+  .toggle-switch.on { background: var(--accent); }
+  .toggle-switch.on::after { transform: translateX(16px); }
+
+  /* ── Submit button ── */
+  .btn-submit {
+    width: 100%;
+    padding: 0.9rem;
+    border-radius: 10px;
+    border: none;
+    background: var(--accent);
+    color: #000;
+    font-family: var(--font-main);
+    font-size: 0.95rem;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 0.5rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .btn-submit:hover { background: #f5c842; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(240,185,11,0.3); }
+  .btn-submit:active { transform: translateY(0); }
+  .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  .btn-submit.loading::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    animation: shimmer 1s infinite;
+  }
+  @keyframes shimmer { from{transform:translateX(-100%)} to{transform:translateX(100%)} }
+
+  /* ── Result panel ── */
+  .result-card {
+    grid-column: 1 / -1;
+    display: none;
+  }
+  .result-card.show { display: block; }
+
+  .result-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+  }
+  .result-icon {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1rem;
+    flex-shrink: 0;
+  }
+  .result-icon.success { background: rgba(14,203,129,0.15); color: var(--green); }
+  .result-icon.failure { background: rgba(246,70,93,0.15);  color: var(--red); }
+  .result-title { font-size: 1rem; font-weight: 700; }
+  .result-title.success { color: var(--green); }
+  .result-title.failure { color: var(--red); }
+
+  .result-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 0.75rem;
+  }
+  .result-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.75rem;
+  }
+  .result-item-label {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-bottom: 0.3rem;
+  }
+  .result-item-value {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text);
+    word-break: break-all;
+  }
+  .result-item-value.filled { color: var(--green); }
+  .result-item-value.new    { color: var(--accent); }
+  .result-item-value.buy    { color: var(--green); }
+  .result-item-value.sell   { color: var(--red); }
+
+  .error-msg {
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    color: var(--red);
+    background: rgba(246,70,93,0.08);
+    border: 1px solid rgba(246,70,93,0.2);
+    border-radius: 8px;
+    padding: 0.85rem 1rem;
+  }
+
+  /* ── Order history ── */
+  .history-list { display: flex; flex-direction: column; gap: 0.6rem; }
+  .history-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.7rem 0.9rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    animation: slideIn 0.3s ease;
+  }
+  @keyframes slideIn { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
+  .history-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .history-dot.success { background: var(--green); }
+  .history-dot.failure { background: var(--red); }
+  .history-symbol { font-weight: 700; color: var(--text); min-width: 70px; }
+  .history-type   { color: var(--muted); min-width: 90px; }
+  .history-side-buy  { color: var(--green); min-width: 40px; }
+  .history-side-sell { color: var(--red);   min-width: 40px; }
+  .history-status { color: var(--accent); margin-left: auto; }
+  .history-empty  { color: var(--muted); font-family: var(--font-mono); font-size: 0.8rem; text-align: center; padding: 1rem 0; }
+
+  /* ── Price field toggle ── */
+  .price-fields { transition: opacity 0.2s; }
+  .price-fields.hidden { opacity: 0.3; pointer-events: none; }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <!-- Header -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">₿</div>
+      <div>
+        <div class="logo-text">Futures <span>Bot</span></div>
+      </div>
+    </div>
+    <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
+      <span class="badge badge-testnet">Testnet</span>
+      <span class="badge badge-mock" id="modeBadge">Real Mode</span>
+    </div>
+  </header>
+
+  <!-- Status bar -->
+  <div class="status-bar">
+    <div class="dot" id="statusDot"></div>
+    <span id="statusText">Checking connection...</span>
+  </div>
+
+  <!-- Main grid -->
+  <div class="grid">
+
+    <!-- Order Form -->
+    <div class="card">
+      <div class="card-title">Place Order</div>
+
+      <!-- Symbol -->
+      <div class="form-group">
+        <label>Symbol</label>
+        <select id="symbol">
+          <option value="BTCUSDT">BTCUSDT</option>
+          <option value="ETHUSDT">ETHUSDT</option>
+          <option value="BNBUSDT">BNBUSDT</option>
+          <option value="SOLUSDT">SOLUSDT</option>
+          <option value="XRPUSDT">XRPUSDT</option>
+        </select>
+      </div>
+
+      <!-- Side -->
+      <div class="form-group">
+        <label>Side</label>
+        <div class="side-toggle">
+          <button class="side-btn active-buy" id="btnBuy"  onclick="setSide('BUY')">▲ BUY</button>
+          <button class="side-btn"            id="btnSell" onclick="setSide('SELL')">▼ SELL</button>
+        </div>
+      </div>
+
+      <!-- Order Type -->
+      <div class="form-group">
+        <label>Order Type</label>
+        <select id="orderType" onchange="onTypeChange()">
+          <option value="MARKET">MARKET</option>
+          <option value="LIMIT">LIMIT</option>
+          <option value="STOP_MARKET">STOP_MARKET</option>
+        </select>
+      </div>
+
+      <!-- Quantity -->
+      <div class="form-group">
+        <label>Quantity</label>
+        <input type="number" id="quantity" placeholder="e.g. 0.001" step="0.001" min="0.001" value="0.001">
+      </div>
+
+      <!-- Price (LIMIT only) -->
+      <div class="form-group price-fields hidden" id="priceGroup">
+        <label>Limit Price (USDT)</label>
+        <input type="number" id="price" placeholder="e.g. 100000" step="1">
+      </div>
+
+      <!-- Stop Price (STOP_MARKET only) -->
+      <div class="form-group price-fields hidden" id="stopGroup">
+        <label>Stop Price (USDT)</label>
+        <input type="number" id="stopPrice" placeholder="e.g. 80000" step="1">
+      </div>
+
+      <!-- Mock toggle -->
+      <div class="form-group">
+        <label>Mode</label>
+        <div class="mock-row" onclick="toggleMock()">
+          <span id="mockLabel">Real API (uses .env keys)</span>
+          <div class="toggle-switch" id="mockToggle"></div>
+        </div>
+      </div>
+
+      <!-- Submit -->
+      <button class="btn-submit" id="submitBtn" onclick="placeOrder()">
+        Place Order
+      </button>
+    </div>
+
+    <!-- Order History -->
+    <div class="card">
+      <div class="card-title">Order History</div>
+      <div class="history-list" id="historyList">
+        <div class="history-empty">No orders yet this session</div>
+      </div>
+    </div>
+
+    <!-- Result -->
+    <div class="card result-card" id="resultCard">
+      <div class="card-title">Last Order Result</div>
+      <div id="resultContent"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  let selectedSide = 'BUY';
+  let mockMode     = false;
+  let orderHistory = [];
+
+  // ── On load ──────────────────────────────────────────────────────
+  window.onload = () => {
+    checkConnection();
+    onTypeChange();
+  };
+
+  // ── Connection check ─────────────────────────────────────────────
+  async function checkConnection() {
+    const dot  = document.getElementById('statusDot');
+    const text = document.getElementById('statusText');
+    try {
+      const r = await fetch(`/api/ping?mock=${mockMode}`);
+      const d = await r.json();
+      if (d.connected) {
+        dot.className  = 'dot connected';
+        text.textContent = mockMode
+          ? 'Mock mode active — simulated responses'
+          : 'Connected to Binance Spot Testnet';
+      } else {
+        dot.className  = 'dot error';
+        text.textContent = 'Cannot reach testnet API';
+      }
+    } catch {
+      dot.className  = 'dot error';
+      text.textContent = 'Connection check failed';
+    }
+  }
+
+  // ── Side toggle ───────────────────────────────────────────────────
+  function setSide(side) {
+    selectedSide = side;
+    document.getElementById('btnBuy').className  = side === 'BUY'  ? 'side-btn active-buy'  : 'side-btn';
+    document.getElementById('btnSell').className = side === 'SELL' ? 'side-btn active-sell' : 'side-btn';
+  }
+
+  // ── Order type change ─────────────────────────────────────────────
+  function onTypeChange() {
+    const t = document.getElementById('orderType').value;
+    document.getElementById('priceGroup').className = 'form-group price-fields' + (t === 'LIMIT'       ? '' : ' hidden');
+    document.getElementById('stopGroup').className  = 'form-group price-fields' + (t === 'STOP_MARKET' ? '' : ' hidden');
+  }
+
+  // ── Mock toggle ───────────────────────────────────────────────────
+  function toggleMock() {
+    mockMode = !mockMode;
+    document.getElementById('mockToggle').className = 'toggle-switch' + (mockMode ? ' on' : '');
+    document.getElementById('mockLabel').textContent = mockMode
+      ? 'Mock mode (simulated orders)'
+      : 'Real API (uses .env keys)';
+    document.getElementById('modeBadge').textContent = mockMode ? 'Mock Mode' : 'Real Mode';
+    checkConnection();
+  }
+
+  // ── Place order ───────────────────────────────────────────────────
+  async function placeOrder() {
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.classList.add('loading');
+    btn.textContent = 'Placing...';
+
+    const payload = {
+      symbol:      document.getElementById('symbol').value,
+      side:        selectedSide,
+      type:        document.getElementById('orderType').value,
+      quantity:    parseFloat(document.getElementById('quantity').value),
+      price:       parseFloat(document.getElementById('price').value)     || null,
+      stopPrice:   parseFloat(document.getElementById('stopPrice').value) || null,
+      timeInForce: 'GTC',
+      mock:        mockMode,
+    };
+
+    try {
+      const r    = await fetch('/api/place-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await r.json();
+      renderResult(data, payload);
+      addHistory(data, payload);
+    } catch (err) {
+      renderResult({ success: false, error: err.message }, payload);
+    } finally {
+      btn.disabled = false;
+      btn.classList.remove('loading');
+      btn.textContent = 'Place Order';
+    }
+  }
+
+  // ── Render result ─────────────────────────────────────────────────
+  function renderResult(data, payload) {
+    const card = document.getElementById('resultCard');
+    const cont = document.getElementById('resultContent');
+    card.classList.add('show');
+
+    if (data.success) {
+      const statusClass = (data.status || '').toLowerCase();
+      const sideClass   = (data.side   || '').toLowerCase();
+      cont.innerHTML = `
+        <div class="result-header">
+          <div class="result-icon success">✓</div>
+          <div class="result-title success">Order Placed Successfully</div>
+        </div>
+        <div class="result-grid">
+          <div class="result-item">
+            <div class="result-item-label">Order ID</div>
+            <div class="result-item-value">${data.order_id || '—'}</div>
+          </div>
+          <div class="result-item">
+            <div class="result-item-label">Symbol</div>
+            <div class="result-item-value">${data.symbol || payload.symbol}</div>
+          </div>
+          <div class="result-item">
+            <div class="result-item-label">Side</div>
+            <div class="result-item-value ${sideClass}">${data.side || payload.side}</div>
+          </div>
+          <div class="result-item">
+            <div class="result-item-label">Type</div>
+            <div class="result-item-value">${data.type || payload.type}</div>
+          </div>
+          <div class="result-item">
+            <div class="result-item-label">Status</div>
+            <div class="result-item-value ${statusClass}">${data.status || '—'}</div>
+          </div>
+          <div class="result-item">
+            <div class="result-item-label">Orig Qty</div>
+            <div class="result-item-value">${data.orig_qty || payload.quantity}</div>
+          </div>
+          <div class="result-item">
+            <div class="result-item-label">Executed Qty</div>
+            <div class="result-item-value">${data.executed_qty || '0'}</div>
+          </div>
+          <div class="result-item">
+            <div class="result-item-label">Avg Price</div>
+            <div class="result-item-value">${data.avg_price && data.avg_price !== '0' ? data.avg_price : 'N/A'}</div>
+          </div>
+          <div class="result-item">
+            <div class="result-item-label">Price</div>
+            <div class="result-item-value">${data.price && data.price !== '0.00000000' ? data.price : 'N/A'}</div>
+          </div>
+          <div class="result-item">
+            <div class="result-item-label">Mode</div>
+            <div class="result-item-value">${mockMode ? '⚠ MOCK' : '✓ REAL'}</div>
+          </div>
+        </div>`;
+    } else {
+      cont.innerHTML = `
+        <div class="result-header">
+          <div class="result-icon failure">✗</div>
+          <div class="result-title failure">Order Failed</div>
+        </div>
+        <div class="error-msg">${data.error || 'Unknown error'}</div>`;
+    }
+
+    card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  // ── Add to history ────────────────────────────────────────────────
+  function addHistory(data, payload) {
+    const list = document.getElementById('historyList');
+    const empty = list.querySelector('.history-empty');
+    if (empty) empty.remove();
+
+    const item = document.createElement('div');
+    item.className = 'history-item';
+    const sideClass = payload.side === 'BUY' ? 'history-side-buy' : 'history-side-sell';
+    item.innerHTML = `
+      <div class="history-dot ${data.success ? 'success' : 'failure'}"></div>
+      <span class="history-symbol">${payload.symbol}</span>
+      <span class="history-type">${payload.type}</span>
+      <span class="${sideClass}">${payload.side}</span>
+      <span class="history-status">${data.success ? (data.status || 'OK') : 'FAILED'}</span>`;
+
+    list.insertBefore(item, list.firstChild);
+
+    // keep max 8
+    const items = list.querySelectorAll('.history-item');
+    if (items.length > 8) items[items.length - 1].remove();
+  }
+</script>
+</body>
+</html>

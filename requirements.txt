@@ -1,0 +1,6 @@
+# Official Binance Futures connector (replaces raw requests for cleaner auth/signing)
+# Source: https://github.com/binance/binance-futures-connector-python
+binance-futures-connector==4.1.0
+
+# Environment variable management
+python-dotenv==1.0.1
